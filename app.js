@@ -569,7 +569,7 @@ window.addEventListener('load', () => {
             
             let piece = board.pieces.get(ind(coords[0], coords[1]))
 
-            if (!curMovePiece) {
+            if (!curMovePiece && event.type == downEventType) {
                 if (piece && piece.side == playerSide) {
                     highlightSquare(coords[0], coords[1], 0)
                     curMovePiece = piece
