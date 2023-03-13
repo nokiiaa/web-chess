@@ -1,5 +1,7 @@
 'use strict';
 
+var server = '192.168.0.21:2023';
+
 const hsl = (h, s, l) => `hsl(${h}, ${s}%, ${l}%)`
 const ind = (x, y) => y * 8 + x
 const between = (x, a, b) => a <= x && x < b
@@ -26,6 +28,12 @@ const GameStatus = {
     checkmate: 2
 }
 
+var playerSide = Side.white
+var boardOrientation = playerSide
+var currentSide = Side.white
+
+const flip = x => boardOrientation == Side.black ? 7 ^ x : x
+
 class ChessPiece {
     constructor(type, side, x, y) {
         this.type = type
@@ -37,8 +45,8 @@ class ChessPiece {
     updateUI() {
         if (this.element) {
             this.element.style.backgroundPosition = `${this.type * 20}% ${(1 - this.side) * 100}%`
-            this.element.style.left = this.x * 12.5 + '%'
-            this.element.style.top  = this.y * 12.5 + '%'
+            this.element.style.left = flip(this.x) * 12.5 + '%'
+            this.element.style.top  = flip(this.y) * 12.5 + '%'
         }
         
         return this
@@ -60,7 +68,7 @@ class ChessBoard {
     constructor() {
         this.pieces = new Map()
         this.material = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
-
+        this.moves = []
     }
     
     rebuildStatistics() {
@@ -85,8 +93,14 @@ class ChessBoard {
         var index = ind(x, y)
 
         // This is castling, move the rook
-        if (piece.type == Pieces.king && changeX == 2)
-            this.makeMove(this.pieces.get(ind(dx < 0 ? 0 : 7, piece.y)), x - dx/2, piece.y)
+        if (piece.type == Pieces.king && changeX == 2) {
+            var rook_ind = ind(dx < 0 ? 0 : 7, piece.y)
+            var rook_piece = this.pieces.get(rook_ind)
+            this.pieces.delete(rook_ind)
+            var rook_nx = rook_piece.x = x - dx/2
+            var rook_ny = rook_piece.y = piece.y
+            this.pieces.set(ind(rook_nx, rook_ny), rook_piece.updateUI())
+        }
                 
         var captured = this.pieces.get(index)
         
@@ -101,7 +115,12 @@ class ChessBoard {
         
         this.pieces.delete(index)
                 
-        this.lastMove = {movingPiece: piece, oldX: piece.x, oldY: piece.y, newX: x, newY: y}
+        var thisMove = {
+            movingPiece: piece,
+            oldX: piece.x, oldY: piece.y,
+            newX: x, newY: y
+        }
+
         piece.lastMove = {oldX: piece.x, oldY: piece.y, newX: x, newY: y}
         piece.x = x
         piece.y = y
@@ -111,10 +130,11 @@ class ChessBoard {
             piece.y == (1 - piece.side) * 7) {
             piece.type = Pieces.queen
             this.material[piece.side][Pieces.pawn]--
-            this.material[piece.side][Pieces.queen]++
+            this.material[piece.side][piece.type]++
         }
         
         this.pieces.set(ind(x, y), piece.updateUI())
+        this.moves.push(thisMove)
     }
     
     findByElement(element) {
@@ -142,6 +162,7 @@ class ChessBoard {
         })
         
         b.material = [[], []]
+        b.totalMoves = this.totalMoves + 1
         
         for (var i = 0; i < 2; i++)
             for (var j = 0; j < 6; j++)
@@ -163,7 +184,7 @@ class ChessBoard {
                 
         return check
     }
-    
+        
     allLegalMoves() {
         let moves = [[], []]
 
@@ -254,8 +275,10 @@ class ChessBoard {
                     do { 
                         if (j) x += i
                         else y += i
-                        
-                    } while (tryAdd(x, y, true, false, false) && !this.isOccupied(piece, x, y))
+                        tryAdd(x, y, true, false, false)
+                    } while (between(piece.x + x, 0, 8) &&
+                        between(piece.y + y, 0, 8) &&
+                        !this.isOccupied(piece, x, y))
                 }
             }
             
@@ -264,10 +287,10 @@ class ChessBoard {
                 for (var j = -1; j <= 1; j += 2) {
                     var x = 0, y = 0
                     
-                    do { 
-                        x += i
-                        y += j
-                    } while (tryAdd(x, y, true, false, false) && !this.isOccupied(piece, x, y))
+                    do tryAdd(x += i, y += j, true, false, false)
+                    while (between(piece.x + x, 0, 8) &&
+                        between(piece.y + y, 0, 8) &&
+                        !this.isOccupied(piece, x, y))
                 }
             }
         }
@@ -278,8 +301,8 @@ class ChessBoard {
                 tryAdd(0, fside * 2, false, false, false)
             
             // En passant
-            if (this.lastMove) {
-                let enemy = this.lastMove.movingPiece
+            if (this.moves.length) {
+                let enemy = this.moves[this.moves.length - 1].movingPiece
                 
                 let dx = enemy.lastMove.newX - piece.x
     
@@ -312,15 +335,18 @@ class ChessBoard {
             let rrook = this.pieces.get(ind(7, piece.y))
             
             let canCastle = rook => {
+                if (rook.type != Pieces.rook || rook.side != side)
+                    return false
+                
                 let dx = Math.sign(rook.x - piece.x)
                 
                 var allowed = !rook.lastMove && !piece.lastMove
                 
                 var X = -1
                 
-                for (var i = 1; allowed && between(X = piece.x + i * dx, 1, 7); i++)
+                for (var i = 1; allowed && between(X = piece.x + i * dx, 2, 7); i++)
                     allowed &= !this.isOccupied(piece, i * dx, 0)
-                        && !this.branchOut(piece, X, piece.y).inCheck(piece.side)
+                        && (i == 1 || !this.branchOut(piece, X, piece.y).inCheck(piece.side))
                 
                 return allowed
             }
@@ -364,9 +390,6 @@ var curMovePointers = []
 
 var highlightedSquares = []
 
-var playerSide = Side.white
-var currentSide = playerSide
-
 var board = new ChessBoard()
 
 const switchSide = () => {
@@ -381,7 +404,7 @@ const highlightTheme = [
 ]
 
 const highlightSquare = (x, y, i) => {
-    var element = boardSquares[ind(x, y)]
+    var element = boardSquares[ind(flip(x), flip(y))]
     
     if (element) {
         let entry = highlightTheme[i]
@@ -407,7 +430,7 @@ const _unhighlight = e => {
 }
 
 const unhighlightSquare = (x, y) => {
-    const index = ind(x, y)
+    const index = ind(flip(x), flip(y))
     var element = boardSquares[index]
     
     if (element) {
@@ -458,6 +481,12 @@ const postMove = () => {
         gameOver = false
     
     moveCounter++
+}
+
+var initialBoardString = ''
+
+String.prototype.replaceAt = function(index, replacement) {
+    return this.substring(0, index) + replacement + this.substring(index + replacement.length);
 }
 
 class AIController {
@@ -513,16 +542,41 @@ class AIController {
     
     async move() {
         setTimeout(() => {
-            var result = this.search(this.board, 4, -Infinity, +Infinity, this.side)
-            var move = result[1]
-            
-            highlightSquare(move[0].x, move[0].y, 0)
-            highlightSquare(move[1], move[2], 1)
+            let finishMove = result => {
+                var move = result[1]
+                highlightSquare(move[0].x, move[0].y, 0)
+                highlightSquare(move[1], move[2], 1)
 
-            board.makeMove(move[0], move[1], move[2])
+                board.makeMove(move[0], move[1], move[2])
+                    
+                switchSide()
+                postMove()
+            }
             
-            switchSide()
-            postMove()
+            const xhttp = new XMLHttpRequest();
+            const board = this.board;
+                
+            xhttp.onload = function() {
+                var response = this.responseText.split(' ');
+                    
+                console.log(response)
+                let piece = board.pieces.get(ind(+response[0], +response[1]))
+                    
+                finishMove([0, [
+                        piece,
+                        +response[2],
+                        +response[3]]])
+            }
+                     
+            var server = document.getElementById('ip').value
+            var max_depth = +document.getElementById('max_depth').value
+            var max_time = +document.getElementById('max_time').value.replace(',', '.')
+                     
+            xhttp.open('POST', `http://${server}/chess_engine`, true)
+            xhttp.send(
+                `${initialBoardString}\n${max_depth} ${max_time} ${this.board.moves.length}\n` +
+                this.board.moves.map(m => `${m.oldX} ${m.oldY} ${m.newX} ${m.newY}`).join('\n') +
+                '\n')
         }, 500)
     }
 }
@@ -535,7 +589,7 @@ window.addEventListener('load', () => {
     divBoard.className = 'board'
         
     divBoard.style.backgroundColor = hsl(squareBaseHue, 100, 30)
-            
+                
     for (var y = 0; y < 8; y++) {
         for (var x = 0; x < 8; x++) {
             var square = document.createElement('div')
@@ -550,14 +604,19 @@ window.addEventListener('load', () => {
     }
     
     board.start()
-        
+    
+    initialBoardString = '0'.repeat(64)
+                
+    for (const piece of board.pieces.values())
+        initialBoardString = initialBoardString.replaceAt(piece.x + piece.y * 8, (piece.type + 1 | piece.side << 3).toString('16'))
+    
     let mouseDown = event => {
         event.stopPropagation()
         
         // Register only a single event type to prevent duplicates
         if (!downEventType && event.type.match(/touchstart|mousedown/g))
             downEventType = event.type
-                
+                        
         if (!gameOver && currentSide == playerSide) {            
             let boardRect = divBoard.getBoundingClientRect()
             let X = (event.clientX || event.touches[0].pageX) - boardRect.left
@@ -565,7 +624,7 @@ window.addEventListener('load', () => {
             let xfactor = 8 / boardRect.width
             let yfactor = 8 / boardRect.height
             
-            var coords = [Math.floor(X * xfactor), Math.floor(Y * yfactor)]
+            var coords = [flip(Math.floor(X * xfactor)), flip(Math.floor(Y * yfactor))]
             
             let piece = board.pieces.get(ind(coords[0], coords[1]))
 
@@ -576,10 +635,11 @@ window.addEventListener('load', () => {
 
                     board.legalMoves(piece, true).forEach(x => {
                         var ptr = document.createElement('div')
+                        x[1]
                         
                         ptr.className = 'board_move_pointer'
-                        ptr.style.left = `${(x[0] + .5) * 12.5 - 4/2}%`
-                        ptr.style.top = `${(x[1] + .5) * 12.5 - 4/2}%`
+                        ptr.style.left = `${(flip(x[0]) + .5) * 12.5 - 4/2}%`
+                        ptr.style.top = `${(flip(x[1]) + .5) * 12.5 - 4/2}%`
                         
                         var captured = board.pieces.get(ind(x[0], x[1]))
                         
@@ -633,7 +693,10 @@ window.addEventListener('load', () => {
         if (curMovePiece)
             mouseDown(event)
     }
-    
+        
+    if (currentSide == Side.black)
+        ai.move()
+
     divBoard.addEventListener('mousedown', mouseDown)
     divBoard.addEventListener('mouseup', mouseUp)
     divBoard.addEventListener('touchstart', mouseDown)
@@ -649,4 +712,5 @@ window.addEventListener('load', () => {
     })
         
     document.body.appendChild(divBoard)
+    
 });

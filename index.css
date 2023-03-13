@@ -9,12 +9,38 @@ body {
     position: relative;
 }
 
+.settings {
+    text-align: right;
+    display: block;
+    margin: 5px;
+    left: 50%;
+    transform: translate(-50%, 0%);
+    z-index: 5;
+    position: absolute;
+}
+
+label {
+    font-style: italic;
+    padding: 8px;
+    color: white;
+    font-family: 'Tilt Neon', cursive;
+}
+
+input {
+    border-style: solid;
+    border-color: white;
+    border-radius: 5px;
+    background-color: black;
+    color: white;
+    font-family: 'Tilt Neon', cursive;
+}
+
 .board {
     width: min(90vw, 70vh);
     height: min(90vw, 70vh);
+    margin: max(50vh - 45vw, 15vh) max(5vw, 50vw - 35vh);
     font-size: 0;
-    margin: max(50vh - 45vw, 15vh) auto;
-    position: relative;
+    position: absolute;
 }
 
 .board_square {
