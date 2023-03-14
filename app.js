@@ -1,7 +1,5 @@
 'use strict';
 
-var server = '192.168.0.21:2023';
-
 const hsl = (h, s, l) => `hsl(${h}, ${s}%, ${l}%)`
 const ind = (x, y) => y * 8 + x
 const between = (x, a, b) => a <= x && x < b
@@ -553,11 +551,11 @@ class AIController {
                 postMove()
             }
             
-            const xhttp = new XMLHttpRequest();
-            const board = this.board;
+            const xhttp = new XMLHttpRequest()
+            const board = this.board
                 
             xhttp.onload = function() {
-                var response = this.responseText.split(' ');
+                var response = this.responseText.split(' ')
                     
                 console.log(response)
                 let piece = board.pieces.get(ind(+response[0], +response[1]))
@@ -568,11 +566,10 @@ class AIController {
                         +response[3]]])
             }
                      
-            var server = document.getElementById('ip').value
             var max_depth = +document.getElementById('max_depth').value
             var max_time = +document.getElementById('max_time').value.replace(',', '.')
                      
-            xhttp.open('POST', `http://${server}/chess_engine`, true)
+            xhttp.open('POST', `chess_engine`, true)
             xhttp.send(
                 `${initialBoardString}\n${max_depth} ${max_time} ${this.board.moves.length}\n` +
                 this.board.moves.map(m => `${m.oldX} ${m.oldY} ${m.newX} ${m.newY}`).join('\n') +
