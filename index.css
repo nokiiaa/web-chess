@@ -1,0 +1,84 @@
+html, body {
+    background-color: hsl(0, 0%, 10%);
+    overflow-x: hidden;
+    overflow-y: hidden;
+    height: 100%;
+}
+
+body {
+    position: relative;
+}
+
+.settings {
+    text-align: right;
+    display: block;
+    margin: 5px;
+    left: 50%;
+    transform: translate(-50%, 0%);
+    z-index: 5;
+    position: absolute;
+}
+
+label {
+    font-style: italic;
+    padding: 8px;
+    color: white;
+    font-family: 'Tilt Neon', cursive;
+}
+
+input {
+    border-style: solid;
+    border-color: white;
+    border-radius: 5px;
+    background-color: black;
+    color: white;
+    font-family: 'Tilt Neon', cursive;
+}
+
+.board {
+    width: min(90vw, 70vh);
+    height: min(90vw, 70vh);
+    margin: max(50vh - 45vw, 15vh) max(5vw, 50vw - 35vh);
+    font-size: 0;
+    position: absolute;
+}
+
+.board_square {
+    --color: black;
+    border-radius: 4%;
+    font-size: 0;
+    pointer-events: none;
+    cursor: default;
+    display: inline-block;
+    width: 12.5%;
+    height: 12.5%;
+    z-index: 1;
+    transition: background-color 0.05s linear, border-radius 0.1s ease-in-out;
+    background-color: var(--color);
+}
+
+.board_piece {
+    font-size: 0;
+    pointer-events: none;
+    cursor: default;
+    width: 12.5%;
+    height: 12.5%;
+    background-size: 600% 200%;
+    position: absolute;
+    z-index: 4;
+    transition: left 0.25s ease-in-out, top 0.25s ease-in-out, opacity 0.25s ease-in-out;   
+}
+
+.board_move_pointer {
+    font-size: 0;
+    pointer-events: none;
+    cursor: default;
+    opacity: 0.7;
+    width: 4%;
+    height: 4%;
+    position: absolute;
+    z-index: 3;
+    background: hsl(300, 100%, 10%);
+    margin: auto auto;
+    border-radius: 50%;
+}
